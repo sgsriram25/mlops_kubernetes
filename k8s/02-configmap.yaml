@@ -1,0 +1,26 @@
+# ConfigMap stores non-sensitive configuration data as key-value pairs.
+# Pods can consume ConfigMaps as environment variables, command-line arguments,
+# or as configuration files in a volume.
+#
+# Benefits:
+# - Separates configuration from application code
+# - Allows configuration changes without rebuilding images
+# - Can be shared across multiple pods
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: url-shortener-config
+  namespace: url-shortener
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/component: config
+data:
+  # Application settings
+  APP_NAME: "url-shortener"
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  
+  # Note: BASE_URL will be updated after LoadBalancer gets external IP
+  # For now, we use a placeholder
+  BASE_URL: "http://localhost:8080"

@@ -1,0 +1,60 @@
+# HorizontalPodAutoscaler (HPA) automatically scales the number of pods
+# based on observed CPU utilization or other metrics.
+#
+# This is essential for handling variable traffic loads efficiently.
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: url-shortener-hpa
+  namespace: url-shortener
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/component: autoscaler
+spec:
+  # Reference to the deployment to scale
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: url-shortener
+  
+  # Scaling boundaries
+  minReplicas: 2   # Minimum pods (for high availability)
+  maxReplicas: 10  # Maximum pods (cost control)
+  
+  # Metrics for scaling decisions
+  metrics:
+    # Scale based on CPU utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70  # Target 70% CPU usage
+    
+    # Scale based on memory utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80  # Target 80% memory usage
+  
+  # Scaling behavior configuration
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Wait 5 min before scaling down
+      policies:
+        - type: Percent
+          value: 50          # Scale down by max 50% at a time
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0  # Scale up immediately
+      policies:
+        - type: Percent
+          value: 100         # Can double pods
+          periodSeconds: 15
+        - type: Pods
+          value: 4           # Or add up to 4 pods
+          periodSeconds: 15
+      selectPolicy: Max      # Use whichever allows more scaling

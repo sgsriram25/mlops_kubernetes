@@ -1,0 +1,27 @@
+# PodDisruptionBudget (PDB) limits the number of pods that can be
+# simultaneously unavailable during voluntary disruptions like:
+# - Node drains for maintenance
+# - Cluster upgrades
+# - Deployment updates
+#
+# This ensures your application maintains minimum availability.
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: url-shortener-pdb
+  namespace: url-shortener
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/component: pdb
+spec:
+  # Minimum number of pods that must be available
+  minAvailable: 1
+  
+  # Alternative: maxUnavailable: 1 (max pods that can be down)
+  
+  # Selector matches pods this budget applies to
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/component: api

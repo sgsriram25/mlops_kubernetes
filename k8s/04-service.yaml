@@ -1,0 +1,30 @@
+# Service provides a stable network endpoint for accessing pods.
+# LoadBalancer type creates an external load balancer (on GCP)
+# that routes traffic to the pods.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: url-shortener-service
+  namespace: url-shortener
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/component: service
+spec:
+  # Service type: LoadBalancer creates external IP on cloud providers
+  type: LoadBalancer
+  
+  # Selector matches pods with these labels
+  selector:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/component: api
+  
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80           # External port (what users access)
+      targetPort: 8080   # Container port (where app listens)
+  
+  # Session affinity (optional): route same client to same pod
+  # Useful if you add in-memory session storage
+  sessionAffinity: None

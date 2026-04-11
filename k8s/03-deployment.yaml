@@ -1,0 +1,169 @@
+# Deployment manages ReplicaSets and provides declarative updates for Pods.
+# This deployment includes:
+# - Resource limits and requests (for proper scheduling)
+# - Liveness and readiness probes (for health monitoring)
+# - ConfigMap injection (for configuration management)
+# - Pod anti-affinity (for high availability across nodes)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: url-shortener
+  namespace: url-shortener
+  labels:
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/component: api
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  # Number of pod replicas to maintain
+  replicas: 3
+  
+  # Strategy for rolling updates
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Max pods above desired count during update
+      maxUnavailable: 0  # Ensure zero downtime
+  
+  # Selector to identify pods managed by this deployment
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/component: api
+  
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/component: api
+        app.kubernetes.io/version: "1.0.0"
+      annotations:
+        # Force pod restart when ConfigMap changes
+        checksum/config: "v1"
+    spec:
+      # Graceful termination period
+      terminationGracePeriodSeconds: 30
+      
+      # Pod anti-affinity: spread pods across different nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: url-shortener
+                topologyKey: kubernetes.io/hostname
+      
+      containers:
+        - name: url-shortener
+          # Replace with your GCR image after building
+          # image: gcr.io/YOUR_PROJECT_ID/url-shortener:v1.0.0
+          image: python:3.11-slim
+          
+          # For demo: run app directly (replace with your image in production)
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              pip install fastapi uvicorn pydantic --quiet &&
+              cat > /app/main.py << 'EOF'
+              from fastapi import FastAPI, HTTPException, status
+              from fastapi.responses import RedirectResponse
+              from pydantic import BaseModel, HttpUrl
+              from datetime import datetime
+              import hashlib
+              import os
+
+              app = FastAPI(title="URL Shortener API", version="1.0.0")
+              url_database = {}
+
+              APP_NAME = os.getenv("APP_NAME", "url-shortener")
+              ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+              BASE_URL = os.getenv("BASE_URL", "http://localhost:8080")
+
+              class URLRequest(BaseModel):
+                  url: HttpUrl
+
+              @app.get("/")
+              async def root():
+                  return {"app": APP_NAME, "environment": ENVIRONMENT, "message": "URL Shortener API", "docs": "/docs"}
+
+              @app.get("/health")
+              async def health():
+                  return {"status": "healthy", "app": APP_NAME, "environment": ENVIRONMENT, "timestamp": datetime.utcnow().isoformat()}
+
+              @app.get("/ready")
+              async def ready():
+                  return {"status": "ready"}
+
+              @app.post("/shorten", status_code=201)
+              async def shorten(request: URLRequest):
+                  url_str = str(request.url)
+                  code = hashlib.md5(url_str.encode()).hexdigest()[:8]
+                  url_database[code] = {"url": url_str, "created": datetime.utcnow().isoformat(), "visits": 0}
+                  return {"original_url": url_str, "short_code": code, "short_url": f"{BASE_URL}/r/{code}"}
+
+              @app.get("/r/{code}")
+              async def redirect(code: str):
+                  if code not in url_database:
+                      raise HTTPException(status_code=404, detail="Not found")
+                  url_database[code]["visits"] += 1
+                  return RedirectResponse(url=url_database[code]["url"])
+
+              @app.get("/stats/{code}")
+              async def stats(code: str):
+                  if code not in url_database:
+                      raise HTTPException(status_code=404, detail="Not found")
+                  return {"code": code, **url_database[code]}
+
+              @app.get("/urls")
+              async def list_urls():
+                  return {"total": len(url_database), "urls": list(url_database.items())}
+              EOF
+              uvicorn main:app --host 0.0.0.0 --port 8080 --app-dir /app
+          
+          imagePullPolicy: Always
+          
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          
+          # Environment variables from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: url-shortener-config
+          
+          # Resource requests and limits
+          resources:
+            requests:
+              cpu: "100m"      # 0.1 CPU cores
+              memory: "128Mi"  # 128 MB RAM
+            limits:
+              cpu: "500m"      # 0.5 CPU cores
+              memory: "256Mi"  # 256 MB RAM
+          
+          # Liveness probe: restarts container if it fails
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          # Readiness probe: removes pod from service if it fails
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          # Security context
+          securityContext:
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
