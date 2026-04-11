@@ -1128,4 +1128,3 @@ This project uses the [recommended Kubernetes labels](https://kubernetes.io/docs
 - [Kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
 - [Kubernetes HPA Walkthrough](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/)
 - [GKE Best Practices](https://cloud.google.com/kubernetes-engine/docs/best-practices)
-- [CHEATSHEET.md](CHEATSHEET.md) — quick kubectl reference for this project
