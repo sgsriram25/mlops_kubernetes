@@ -1,6 +1,6 @@
 # URL Shortener on Google Kubernetes Engine (GKE)
 
-A production-grade, end-to-end tutorial for containerizing a FastAPI microservice and deploying it to Google Kubernetes Engine with full observability, autoscaling, and zero-downtime update patterns.
+Here we will containerize a FastAPI microservice and deploy it to Google Kubernetes Engine with full observability, autoscaling, and zero-downtime update patterns.
 
 ---
 
